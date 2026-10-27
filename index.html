@@ -374,11 +374,11 @@ function ubTasks(){return UBS.map(function(t,i){return {key:"ub:"+i,college:"UB:
 function stepsTable(list,emptyMsg){if(!list.length)return '<div class="scroll"><div class="empty">'+emptyMsg+'</div></div>';var t=today();
  return '<div class="scroll"><table><thead><tr><th>Done</th><th>Due</th><th>College</th><th>Step</th></tr></thead><tbody>'+list.map(function(s){var late=!s.done&&s.date<t;
   return '<tr><td><input type="checkbox" data-step="'+s.key+'"'+(s.done?" checked":"")+' aria-label="Done: '+esc(s.label)+'"></td><td class="date'+(late?" late":"")+'">'+fmt(s.date)+(late?" (late)":"")+'</td><td>'+esc(s.college)+'</td><td class="'+(s.done?"done":"")+'">'+esc(s.label)+'</td></tr>';}).join("")+'</tbody></table></div>';}
-var TSUB=[["me","Me"],["explore","Explore"],["colleges","My Colleges"],["next","Next Steps"],["week","This Week"],["ub","UB Sessions"],["essays","Essays"],["money","Money"],["awards","Award Letters"],["miles","Milestones"],["accounts","Accounts"]];
+var TSUB=[["me","Me"],["explore","Explore"],["colleges","My Colleges"],["next","Next Steps"],["week","This Week"],["ub","UB Sessions"],["summary","Summary"],["essays","Essays"],["money","Money"],["awards","Award Letters"],["miles","Milestones"],["accounts","Accounts"]];
 var tsub="me",q="",cat="";
 function trackerHTML(){
  var h='<div class="stack"><span class="eyebrow">Tracker</span><h2>College Tracker</h2><p class="lede">Build your list and pick each college\'s round. Deadlines for about 200 colleges fill in by themselves; the tracker lays out what to do and when.</p></div><div class="row" role="tablist">'+TSUB.map(function(s){return '<button class="sub" role="tab" data-tsub="'+s[0]+'" aria-selected="'+(tsub===s[0])+'">'+s[1]+(s[0]==="colleges"&&S.colleges.length?" ("+S.colleges.length+")":"")+'</button>';}).join("")+'</div>';
- if(tsub==="me"){var M=[["name","Full name"],["school","High school"],["grad","Graduation year"],["email","Email"],["gpa","Unweighted GPA"],["wgpa","Weighted GPA"],["sat","SAT (if taken)"],["act","ACT (if taken)"],["major","Intended major or interest"]];
+ if(tsub==="me"){var M=[["name","Full name"],["school","High school"],["grad","Graduation year"],["email","Email"],["gpa","Unweighted GPA"],["wgpa","Weighted GPA"],["sat","SAT (if taken)"],["act","ACT (if taken)"],["major","Intended major or interest"],["counselor","UB counselor"]];
   h+='<section class="sheet"><h3>Have a UB College Tracker file?</h3><p class="hint">Load the Excel tracker you were given and your profile, colleges, scholarships and recommenders come in. Nothing is uploaded anywhere; it stays on this device.</p><div class="row"><label class="btn ghost" for="ubimport">Load my UB tracker (.xlsx)</label><input type="file" id="ubimport" accept=".xlsx" hidden></div></section>';
   h+='<section class="sheet"><h3>About me</h3><p class="hint">Your name goes on every file you download. Your GPA and SAT or ACT set the Likely, Target and Reach labels on Explore.</p><div class="grid2">'+M.map(function(m){return '<div class="field"><label for="me-'+m[0]+'">'+m[1]+'</label><input id="me-'+m[0]+'" data-me="'+m[0]+'" value="'+esc(S.me[m[0]])+'"></div>';}).join("")+'</div></section>';}
  if(tsub==="explore"){var mine={};S.colleges.forEach(function(c){mine[c.name]=1;});var items=[],groups=[];
@@ -396,6 +396,13 @@ function trackerHTML(){
   '</tbody></table></div><p class="note">Deadlines filled from the database are this season\'s as collected; confirm each one on the college\'s own admissions page before you rely on it. A college not in the database needs its dates typed in.</p>';}
  if(tsub==="next")h+=stepsTable(allSteps(),"Add a college and its deadline in My Colleges. Your steps appear here, counted back from that date.");
  if(tsub==="week"){var lim=today();lim.setDate(lim.getDate()+7);h+='<p class="hint">Everything due in the next 7 days, plus anything late: your college steps and your UB session tasks.</p>'+stepsTable(allSteps().concat(ubTasks()).filter(function(s){return !s.done&&s.date<=lim;}).sort(function(a,b){return a.date-b.date;}),"Nothing is due in the next 7 days.");}
+ if(tsub==="summary"){var st=allSteps(),t0=today(),late=st.filter(function(x){return !x.done&&x.date<t0;}).length+ubTasks().filter(function(x){return !x.done&&x.date<t0;}).length;
+  var nxt=S.colleges.map(eff).filter(function(d){return d&&d>=t0;}).sort(function(a,b){return a-b;})[0];
+  var ltr={Likely:0,Target:0,Reach:0};S.colleges.forEach(function(c){var d=DBI[c.name];if(d){var f=fit(d);if(ltr[f]!=null)ltr[f]++;}});
+  var sub=S.colleges.filter(function(c){return ["Submitted","Admitted","Deferred","Waitlisted","Not admitted"].indexOf(c.status)>=0;}).length,adm=S.colleges.filter(function(c){return c.status==="Admitted";}).length;
+  var rows=[["Student",who()],["High school",S.me.school||""],["UB counselor",S.me.counselor||""],["Last updated",fmt(new Date())],["Colleges on list",S.colleges.length],["Likely / Target / Reach",ltr.Likely+" / "+ltr.Target+" / "+ltr.Reach],["Submitted",sub],["Admitted",adm],["Next filing date",nxt?fmt(nxt):""],["Days to next",nxt?Math.round((nxt-t0)/86400000):""],["Overdue (college + UB)",late],["Personal statement words",words(psParts().join(" "))],["Scholarships submitted",S.money.filter(function(m){return m.status==="Submitted"||m.status==="Awarded";}).length],["UB tasks done",countDone("ub",UBS)+" of "+UBS.length]];
+  var txt=rows.map(function(r){return r[0]+": "+r[1];}).join("\n");
+  h+='<p class="hint">Filled in automatically, the same numbers as the Summary tab of your UB College Tracker. Copy it into a message to your counselor, or download the Excel report.</p><div class="scroll"><table><tbody>'+rows.map(function(r){return '<tr><td><strong>'+esc(r[0])+'</strong></td><td>'+esc(r[1])+'</td></tr>';}).join("")+'</tbody></table></div><div class="draft" id="sum-txt" hidden>'+esc(txt)+'</div><div class="row"><button class="btn ghost" data-copy="sum-txt">Copy summary</button></div>';}
  if(tsub==="ub"){var groups=[],last=null;UBS.forEach(function(t,i){if(t.session!==last){groups.push({name:t.session,items:[]});last=t.session;}groups[groups.length-1].items.push(i);});
   var n=0;UBS.forEach(function(_,i){if(S.ub[i])n++;});
   h+='<p class="hint">Your University Bridges plan, one block per Thursday session. '+n+' of '+UBS.length+' done. No sessions November 26, December 24 or December 31.</p>'+groups.map(function(g){var t=today(),allDone=g.items.every(function(i){return S.ub[i];});return '<section class="sheet"><h3>'+esc(g.name)+(allDone?' <span class="pill ok">Done</span>':'')+'</h3>'+g.items.map(function(i){var x=UBS[i],late=!S.ub[i]&&pd(x.due)<t;return '<label class="row" for="ub-'+i+'" style="flex-wrap:nowrap;align-items:flex-start"><input type="checkbox" id="ub-'+i+'" data-step="ub:'+i+'"'+(S.ub[i]?" checked":"")+'><span class="'+(S.ub[i]?"done":"")+'"><span class="pill'+(late?" warn":"")+'">'+esc(x.track)+' · '+esc(x.owner)+'</span> '+esc(x.task)+'</span></label>';}).join("")+'</section>';}).join("");}
@@ -512,7 +519,11 @@ document.addEventListener("click",function(e){
 /* ---------- shell ---------- */
 var TABS=[["start","Start"],["tracker","Tracker"],["walk","Essay Walk-through"],["essay","Personal Statement"],["templates","Templates"],["guide","Guide"]];
 var tab="start";
-(function(){var hs=(location.hash||"").slice(1);TABS.forEach(function(t){if(t[0]===hs)tab=hs;});})();
+var welcome="";
+(function(){var hs=(location.hash||"").slice(1);TABS.forEach(function(t){if(t[0]===hs)tab=hs;});
+ var m=/^s\.([A-Za-z0-9_-]+)$/.exec(hs);if(m){try{var b=m[1].replace(/-/g,"+").replace(/_/g,"/");while(b.length%4)b+="=";var o=JSON.parse(decodeURIComponent(escape(atob(b))));
+  if(!(S.me.name||"").trim()||S.me.name===o.n){var mp={n:"name",h:"school",e:"email",g:"gpa",w:"wgpa",s:"sat",a:"act",m:"major"};Object.keys(mp).forEach(function(k){if(o[k]!=null&&o[k]!=="")S.me[mp[k]]=String(o[k]);});S.me.grad=S.me.grad||"2027";if(o.c&&!S.me.counselor)S.me.counselor=o.c;save();welcome=o.n||"";}
+  else welcome="__other";}catch(e){}tab="start";try{history.replaceState(null,"","#start");}catch(e){}}})();
 function render(){
  document.getElementById("nav").innerHTML=TABS.map(function(t){return '<button class="tab" role="tab" data-go="'+t[0]+'" aria-selected="'+(tab===t[0])+'">'+t[1]+'</button>';}).join("");
  var m=document.getElementById("main");
@@ -633,6 +644,7 @@ function saveXlsx(){
  sheet("Accounts",[["Account or portal","Web address","Username or email","Notes"]].concat(S.accounts.map(function(a){return [a.name||"",a.url||"",a.user||"",a.notes||""];})),[30,36,30,40]);
  offer(who()+" - College Tracker.xlsx",X.write(wb,{type:"array",bookType:"xlsx",cellDates:true}));
 }
+if(welcome==="__other")toast("This link belongs to another student. Your own tracker is still here.");else if(welcome)toast("Welcome, "+welcome.split(" ")[0]+". Your tracker is set up with your profile.");
 window.__caw={S:S,saveWord:saveWord,saveXlsx:saveXlsx,setDl:function(d){dl=d;}};
 render();
 })();
