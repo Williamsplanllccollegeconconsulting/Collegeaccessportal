@@ -380,7 +380,6 @@ var tsub="me",q="",cat="";
 function trackerHTML(){
  var h='<div class="stack"><span class="eyebrow">Tracker</span><h2>College Tracker</h2><p class="lede">Build your list and pick each college\'s round. Deadlines for about 200 colleges fill in by themselves; the tracker lays out what to do and when.</p></div><div class="row" role="tablist">'+TSUB.map(function(s){return '<button class="sub" role="tab" data-tsub="'+s[0]+'" aria-selected="'+(tsub===s[0])+'">'+s[1]+(s[0]==="colleges"&&S.colleges.length?" ("+S.colleges.length+")":"")+'</button>';}).join("")+'</div>';
  if(tsub==="me"){var M=[["name","Full name"],["school","High school"],["grad","Graduation year"],["email","Email"],["gpa","Unweighted GPA"],["wgpa","Weighted GPA"],["sat","SAT (if taken)"],["act","ACT (if taken)"],["major","Intended major or interest"],["counselor","UB counselor"]];
-  h+='<section class="sheet"><h3>Have a UB College Tracker file?</h3><p class="hint">Load the Excel tracker you were given and your profile, colleges, scholarships and recommenders come in. Nothing is uploaded anywhere; it stays on this device.</p><div class="row"><label class="btn ghost" for="ubimport">Load my UB tracker (.xlsx)</label><input type="file" id="ubimport" accept=".xlsx" hidden></div></section>';
   h+='<section class="sheet"><h3>About me</h3><p class="hint">Your name goes on every file you download. Your GPA and SAT or ACT set the Likely, Target and Reach labels on Explore.</p><div class="grid2">'+M.map(function(m){return '<div class="field"><label for="me-'+m[0]+'">'+m[1]+'</label><input id="me-'+m[0]+'" data-me="'+m[0]+'" value="'+esc(S.me[m[0]])+'"></div>';}).join("")+'</div></section>';}
  if(tsub==="explore"){var mine={};S.colleges.forEach(function(c){mine[c.name]=1;});var items=[],groups=[];
   if(DB.length){DB.forEach(function(d){if(groups.indexOf(d.Category)<0)groups.push(d.Category);if(cat&&cat!==d.Category)return;if(!q||d.College.toLowerCase().indexOf(q.toLowerCase())>=0)items.push([d.College,d.Category,d]);});}
@@ -554,7 +553,6 @@ function onEdit(e,final){
  var t=e.target,d=t.dataset;if(!d)return;
  if(t.id==="ex-q"){q=t.value;keepFocus(render);var el=document.getElementById("ex-q");if(el)el.setSelectionRange(q.length,q.length);return;}
  if(t.id==="ex-cat"){cat=t.value;render();return;}
- if(t.id==="ubimport"){var uf=t.files&&t.files[0];if(!uf)return;var ur=new FileReader();ur.onload=function(){try{importUB(new Uint8Array(ur.result));}catch(x){toast("That file does not look like a UB College Tracker.");}};ur.readAsArrayBuffer(uf);return;}
  if(t.id==="restore"){var file=t.files&&t.files[0];if(!file)return;var fr=new FileReader();fr.onload=function(){try{var o=JSON.parse(fr.result);if(!o||typeof o!=="object"||!o.forms)throw 0;Object.keys(S).forEach(function(k){delete S[k];});for(var k in o)S[k]=o[k];normalize();save();render();toast("Backup loaded");}catch(x){toast("That file is not a backup from this site. Choose the .json file you saved.");}};fr.readAsText(file);return;}
  if(d.chk){if(!final)return;S[d.chk][d.i]=t.checked?1:0;save();render();return;}
  if(d.step){if(d.step.indexOf("ub:")===0){var ui=+d.step.slice(3);if(t.checked)S.ub[ui]=1;else delete S.ub[ui];}else if(t.checked)S.done[d.step]=1;else delete S.done[d.step];save();render();return;}
@@ -572,20 +570,6 @@ function onEdit(e,final){
 document.addEventListener("input",function(e){onEdit(e,false);});
 document.addEventListener("change",function(e){if(e.target.id==="ex-q")return;onEdit(e,true);});
 
-function importUB(buf){var X=window.XLSX;if(!X){toast("Excel support did not load. Check your connection and reload.");return;}
- var wb=X.read(buf,{type:"array",cellDates:true});function sh(n){return wb.Sheets[n]?X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:""}):null;}
- function ds(v){if(v instanceof Date)return v.toISOString().slice(0,10);if(typeof v==="number"&&v>30000){var d=new Date(Math.round((v-25569)*86400000));return d.toISOString().slice(0,10);}return (v||"").toString().slice(0,10).replace(/\//g,"-");}
- var me=sh("Me");if(!me)throw 0;var kv={};me.forEach(function(r){if(r[0]&&r[1]!=="")kv[String(r[0]).trim()]=r[1];});
- var map={"Full name":"name","High school":"school","Personal email":"email","Weighted GPA":"wgpa","Unweighted GPA":"gpa","SAT (highest total)":"sat","ACT (highest composite)":"act","Intended major or career interest":"major"};
- Object.keys(map).forEach(function(k){if(kv[k]!==undefined&&kv[k]!=="")S.me[map[k]]=String(kv[k]);});S.me.grad=S.me.grad||"2027";
- var mode=null;me.forEach(function(r){var a=String(r[0]||"").trim();if(a==="Recommender"){mode="rec";return;}if(a==="Account"){mode="acc";return;}if(!a||/^Ask at least|^Add every college/.test(a)){if(a)mode=null;return;}
-  if(mode==="rec"&&(r[1]||r[2]||r[3])){S.recs.push({id:uid(),name:String(r[1]||""),role:a,forw:String(r[2]||""),asked:ds(r[3])});}
-  if(mode==="acc"&&r[2]){S.accounts.push({id:uid(),name:a,url:String(r[1]||""),user:String(r[2]||""),notes:""});}});
- var mc=sh("My Colleges")||[],n=0;mc.slice(7,27).forEach(function(r){var name=String(r[1]||"").trim();if(!name||S.colleges.some(function(c){return c.name===name;}))return;var round=String(r[4]||"");
-  var c={id:uid(),name:name,round:"",due:"",merit:"",via:"",status:STAT.indexOf(String(r[19]))>=0?String(r[19]):"Not started"};autofill(c,"add");
-  if(ROUNDS.indexOf(round)>=0){c.round=round;autofill(c,"round");}var my=ds(r[6]);if(/^\d{4}-\d{2}-\d{2}$/.test(my)){c.due=my;c.auto=0;}S.colleges.push(c);n++;});
- var mo=sh("Money")||[];mo.slice(7,47).forEach(function(r){var name=String(r[0]||"").trim();if(!name||S.money.some(function(m){return m.name===name;}))return;S.money.push({id:uid(),name:name,site:String(r[1]||""),level:String(r[2]||""),due:ds(r[3]),amount:String(r[5]||""),notes:String(r[6]||""),status:String(r[7]||"Not started")});});
- save();tsub="colleges";render();toast("Loaded "+(S.me.name||"your tracker")+": "+n+" colleges added");}
 /* ---------- UB College Tracker workbook (exact template) ---------- */
 function xesc(t){return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function xcell(xml,ref,val,kind){var re=new RegExp('<c r="'+ref+'"( s="\\d+")?[^>]*?(?:/>|>[\\s\\S]*?</c>)');var m=re.exec(xml);if(!m)return xml;var st=m[1]||"";
